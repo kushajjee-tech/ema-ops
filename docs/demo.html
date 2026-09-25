@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Ema Ops — Product Walkthrough</title>
+<style>
+  @page { size: Letter; margin: 0.45in 0.55in; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif; color: #0f172a; margin: 0; font-size: 9.3pt; line-height: 1.42; }
+  .eyebrow { font-size: 8pt; letter-spacing: .08em; text-transform: uppercase; color: #4f46e5; font-weight: 600; }
+  h1 { font-size: 19pt; margin: 2px 0 2px; }
+  .sub { color: #64748b; font-size: 9.5pt; margin-bottom: 12px; }
+  p { margin: 0 0 10px; text-align: justify; }
+  b { font-weight: 600; }
+  figure { margin: 0; }
+  img { width: 100%; display: block; object-fit: cover; object-position: top left; border: 1px solid #e2e8f0; border-radius: 6px; }
+  figure.hero img { height: 3.0in; }
+  .row img { height: 2.1in; }
+  figcaption { font-size: 8pt; color: #64748b; margin-top: 4px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+  .foot { margin-top: 10px; font-size: 7.5pt; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+</style></head>
+<body>
+  <div class="eyebrow">Prototype walkthrough</div>
+  <h1>Ema Ops: AI Employee monitoring</h1>
+  <div class="sub">Signed in as Kushaj A., Platform Admin · github.com/kushajjee-tech/ema-ops</div>
+  <p>Ema Ops gives an operations team one place to answer <b>“is anything on fire, why, and what else is affected?”</b> for their AI Employees. The <b>Overview</b> opens on a ranked <b>Active Issues</b> panel. It groups recent failed runs by the step and connected system where they broke. Here it shows a <b>critical Okta timeout</b> at “Verify identity”: 25 runs across four workflows and two AI Employees, plus a smaller SAP posting-period warning. Below it are 24-hour stats, a run-activity chart and the agents needing attention. One click on <b>View all affected runs</b> opens the <b>Runs</b> table already filtered to that failure. The table filters by status, agent, workflow, system, date and retries, searches IDs and error text, pages through about 285 runs, and supports bulk retry, escalate and resolve. Opening a run shows its <b>Run Detail</b>: a step-by-step timeline with the failed step expanded to show the error and its payloads, and the trigger and retry chain. A <b>root-cause panel</b> confirms whether the failure is correlated (“24 other runs failed at the same step in Okta”) or isolated. The actions change with the run's status: retry, retry from step and escalate for broken runs; approve and reject for human-in-the-loop steps. It warns before a retry into a system that is still Down, and every action is recorded to the run and the operator's <b>profile activity log</b>. <b>AI Employees</b> shows health for each agent, computed from its 24-hour failure rate (one Issues Detected, two Degraded, one Healthy). <b>Connected Systems</b> shows which dependencies are Down or Degraded and which workflows rely on them.</p>
+  <figure class="hero"><img src="img/overview.png"><figcaption>Overview: ranked Active Issues, 24h stats, run activity and agents needing attention.</figcaption></figure>
+  <div class="row">
+    <figure><img src="img/run-detail.png"><figcaption>Run Detail: failed step expanded, correlated root cause across 4 workflows.</figcaption></figure>
+    <figure><img src="img/runs.png"><figcaption>Runs table: status chips, filters, search and paginated results.</figcaption></figure>
+  </div>
+  <div class="foot">Prototype with deterministic mock data; actions are simulated and would be role-gated and audited in production. Run with <code>npm install &amp;&amp; npm run dev</code>.</div>
+</body></html>

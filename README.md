@@ -1,11 +1,14 @@
 # Ema Ops — AI Employee monitoring prototype
 
+**Live demo:** https://kushajjee-tech.github.io/ema-ops/ · **Walkthrough:** [docs/Ema-Ops-Walkthrough.pdf](docs/Ema-Ops-Walkthrough.pdf)
+
 An operations dashboard for monitoring AI Employees, their workflow runs, and the connected systems they depend on. Everything runs on mock data.
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build
+npm run build:pages  # build for GitHub Pages (deployed automatically on push to main)
 ```
 
 Stack: React 19, TypeScript, Vite, Tailwind v4, React Router, Recharts, sonner (toasts).
@@ -21,6 +24,9 @@ Stack: React 19, TypeScript, Vite, Tailwind v4, React Router, Recharts, sonner (
 | `src/lib/status.ts` | Single source of truth for status colors |
 | `src/components/RunsTable.tsx` | Reusable Runs table (global page, agent Runs tab, pre-filtered links) |
 | `src/pages/RunDetail.tsx` | Timeline, related-runs thread, correlation panel, status-conditional actions |
+| `src/lib/activity.tsx` | Signed-in user + session log of operator actions (drives chips, Run Detail activity, profile) |
+| `src/pages/Profile.tsx` | Profile: identity, role permissions, notification preferences, my activity |
+| `docs/Ema-Ops-Walkthrough.pdf` | One-page product walkthrough with screenshots |
 
 ## Seed data (what to demo)
 
@@ -43,7 +49,8 @@ Stack: React 19, TypeScript, Vite, Tailwind v4, React Router, Recharts, sonner (
 
 ## Prototype limitations / production notes
 
-- The signed-in user (Kusha Jagarwal, IT Operations Admin) is hard-coded in `Layout.tsx`.
-- Actions (retry, escalate, approve, bulk actions) are mocked: they show a confirmation, then a toast. In production they would be **role-gated (RBAC)** and audited.
+- The signed-in user (Kushaj A., Platform Admin) is hard-coded in `src/lib/activity.tsx`. Sign-out is a no-op.
+- Actions (retry, escalate, approve, bulk actions) don't execute. They confirm, then are recorded to a session-only activity log, so the UI reflects them: chips on runs, locked buttons, and the profile's *My activity* list. Bulk actions skip ineligible runs. Retries into a system that is Down show a warning first. In production these would be **role-gated (RBAC)** and written to a server-side audit log.
+- Notification preferences are saved to the browser's localStorage only.
 - No auth, persistence or real integrations. Alert delivery (Slack/email/pager) is future work.
 - Run IDs are stable across reloads; timestamps move with the current time.

@@ -6,11 +6,13 @@ import { Card, HealthPill, PageHeader, Sparkline } from '../components/ui'
 import { AGENT_BY_ID } from '../data/catalog'
 import { AGENT_SUMMARIES, HEALTH_RANK, type Health } from '../lib/analysis'
 import { fmtPct } from '../lib/format'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { HEALTH } from '../lib/status'
 
 type SortMode = 'health' | 'name' | 'volume'
 
 export function Agents() {
+  useDocumentTitle('AI Employees')
   const [sort, setSort] = useState<SortMode>('health')
   const [only, setOnly] = useState<Health | 'all'>('all')
 
@@ -78,7 +80,7 @@ export function Agents() {
                       <dd className="text-sm font-semibold tabular-nums text-slate-900">{a.runsToday}</dd>
                     </div>
                     <div>
-                      <dt className="text-slate-500">Success</dt>
+                      <dt className="text-slate-500">Success (24h)</dt>
                       <dd className={clsx('text-sm font-semibold tabular-nums', a.health === 'healthy' ? 'text-slate-900' : a.health === 'degraded' ? 'text-amber-700' : 'text-red-600')}>
                         {fmtPct(a.stats24h.successRate)}
                       </dd>

@@ -11,7 +11,10 @@ import { RUN_BY_ID } from '../data/seed'
 import type { Run, RunStep } from '../data/types'
 import { Button, Card, CardHeader, Empty, Modal, Pill, StatusPill, StepStatusPill, SystemBadge } from '../components/ui'
 import { downloadJson, useConfirm } from '../lib/actions'
-import { activeIncidents, correlate, CORRELATION_WINDOW_MS, problemStep, signatureOf } from '../lib/analysis'
+import { ACTIVITY_LABEL, fmtClock, useActivity } from '../lib/activity'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
+import { ActivityChip, LatestActivityChip } from '../components/ActivityChip'
+import { activeIncidents, correlate, CORRELATION_WINDOW_MS, problemStep, signatureOf, systemSummary } from '../lib/analysis'
 import { runsUrl } from '../lib/filters'
 import { fmtDateTime, fmtDuration, fmtRelative, fmtTime } from '../lib/format'
 import { SEVERITY, STEP_STATUS } from '../lib/status'
@@ -33,6 +36,7 @@ export function RunDetail() {
 }
 
 function RunDetailView({ run }: { run: Run }) {
+  useDocumentTitle(run.id)
   const agent = AGENT_BY_ID[run.agentId]
   const workflow = WORKFLOW_BY_ID[run.workflowId]
   const showCorrelation = run.status === 'failed' || run.status === 'partial' || run.status === 'stuck'
@@ -52,6 +56,7 @@ function RunDetailView({ run }: { run: Run }) {
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="font-mono text-lg font-semibold text-slate-900">{run.id}</h1>
               <StatusPill status={run.status} className="text-sm" />
+              <LatestActivityChip runId={run.id} />
               {run.attempt > 1 && <Pill tone={STEP_STATUS.pending}>Attempt {run.attempt}</Pill>}
             </div>
             <div className="mt-1 text-sm text-slate-600">
@@ -98,6 +103,7 @@ function RunDetailView({ run }: { run: Run }) {
           <StepTimeline run={run} />
         </Card>
         <div className="space-y-4">
+          <OperatorActivity run={run} />
           {showCorrelation && <CorrelationPanel run={run} />}
           <Card>
             <CardHeader title="Systems touched" />
@@ -133,10 +139,27 @@ function Meta({ label, children }: { label: string; children: ReactNode }) {
 
 // ---------- Actions (status-conditional) ----------
 
+function latestAttempt(run: Run): Run {
+  let r = run
+  while (r.retriedBy && RUN_BY_ID.get(r.retriedBy)) r = RUN_BY_ID.get(r.retriedBy)!
+  return r
+}
+
 function RunActions({ run }: { run: Run }) {
   const confirm = useConfirm()
+  const navigate = useNavigate()
+  const { record, latestFor } = useActivity()
   const [payloadOpen, setPayloadOpen] = useState(false)
   const failing = problemStep(run)
+  const done = latestFor(run.id)
+  const systemDown = failing && systemSummary(failing.system).status === 'down'
+  const stepWord = run.status === 'stuck' ? 'stalled' : 'failed'
+
+  const downWarning = systemDown && failing && (
+    <p className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+      {SYSTEM_BY_ID[failing.system].name} is currently Down — a retry will most likely fail again at &ldquo;{failing.name}&rdquo;.
+    </p>
+  )
 
   const exportLogs = (
     <Button
@@ -144,6 +167,7 @@ function RunActions({ run }: { run: Run }) {
       size="sm"
       onClick={() => {
         downloadJson(`${run.id}-logs.json`, run)
+        record('export', [run.id])
         toast.success(`Exported logs for ${run.id}`)
       }}
     >
@@ -152,41 +176,74 @@ function RunActions({ run }: { run: Run }) {
   )
 
   let primary: ReactNode = null
-  if (run.status === 'failed' || run.status === 'stuck') {
+  if ((run.status === 'failed' || run.status === 'stuck') && run.retriedBy) {
+    // Acting on a superseded attempt would fork the retry chain — send the operator to the latest one.
+    const latest = latestAttempt(run)
+    primary = (
+      <Button variant="primary" onClick={() => navigate(`/runs/${latest.id}`)}>
+        Go to latest attempt (#{latest.attempt}) <ArrowRight className="size-3.5" />
+      </Button>
+    )
+  } else if (run.status === 'failed' || run.status === 'stuck') {
+    const locked = done && done.kind !== 'escalate'
     primary = (
       <>
         <Button
           variant="primary"
+          disabled={!!locked}
           onClick={() =>
             confirm({
               title: `Retry ${run.id}?`,
-              body: `A new attempt (#${run.attempt + 1}) of "${WORKFLOW_BY_ID[run.workflowId].name}" will start from the first step.`,
-              confirmLabel: 'Retry run',
-              onConfirm: () => toast.success(`Retry queued — attempt ${run.attempt + 1} of ${run.id}`),
+              body: (
+                <>
+                  A new attempt (#{run.attempt + 1}) of &ldquo;{WORKFLOW_BY_ID[run.workflowId].name}&rdquo; will start from the first step.
+                  {downWarning}
+                </>
+              ),
+              confirmLabel: systemDown ? 'Retry anyway' : 'Retry run',
+              danger: !!systemDown,
+              onConfirm: () => {
+                record('retry', [run.id])
+                toast.success(`Retry queued — attempt ${run.attempt + 1} of ${run.id}`)
+              },
             })
           }
         >
           <RotateCcw className="size-3.5" /> Retry
         </Button>
         <Button
+          disabled={!!locked}
           onClick={() =>
             confirm({
               title: `Retry from "${failing?.name}"?`,
-              body: `Steps before "${failing?.name}" will be skipped and their outputs reused.`,
-              confirmLabel: 'Retry from step',
-              onConfirm: () => toast.success(`Resuming ${run.id} from "${failing?.name}"`),
+              body: (
+                <>
+                  Steps before &ldquo;{failing?.name}&rdquo; will be skipped and their outputs reused.
+                  {downWarning}
+                </>
+              ),
+              confirmLabel: systemDown ? 'Retry anyway' : 'Retry from step',
+              danger: !!systemDown,
+              onConfirm: () => {
+                record('retry_step', [run.id], failing?.name)
+                toast.success(`Resuming ${run.id} from "${failing?.name}"`)
+              },
             })
           }
         >
-          <StepForward className="size-3.5" /> Retry from failed step
+          <StepForward className="size-3.5" /> Retry from {stepWord} step
         </Button>
         <Button
+          disabled={done?.kind === 'escalate'}
           onClick={() =>
             confirm({
               title: 'Escalate to a human?',
               body: `${run.id} will be assigned to the ${AGENT_BY_ID[run.agentId].name} on-call owner with full run context.`,
               confirmLabel: 'Escalate',
-              onConfirm: () => toast.success(`${run.id} escalated to on-call owner`),
+              onConfirm: () => {
+                record('escalate', [run.id])
+                toast.success(`${run.id} escalated to on-call owner`)
+              },
             })
           }
         >
@@ -195,7 +252,7 @@ function RunActions({ run }: { run: Run }) {
       </>
     )
   } else if (run.status === 'awaiting_approval') {
-    primary = <ApprovalButtons run={run} />
+    primary = done ? null : <ApprovalButtons run={run} />
   } else if (run.status === 'success' || run.status === 'partial') {
     primary = (
       <Button onClick={() => setPayloadOpen(true)}>
@@ -217,14 +274,19 @@ function RunActions({ run }: { run: Run }) {
 
 function ApprovalButtons({ run, size = 'md' }: { run: Run; size?: 'sm' | 'md' }) {
   const confirm = useConfirm()
+  const { record, latestFor } = useActivity()
   const step = problemStep(run)
+  const decided = latestFor(run.id)
+  if (decided) return <ActivityChip entry={decided} />
   return (
     <>
       <Button
         size={size}
-        variant="primary"
-        className="bg-emerald-600 hover:bg-emerald-700"
-        onClick={() => toast.success(`Approved "${step?.name}" — ${run.id} will continue`)}
+        variant="success"
+        onClick={() => {
+          record('approve', [run.id], step?.name)
+          toast.success(`Approved "${step?.name}" — ${run.id} will continue`)
+        }}
       >
         <ThumbsUp className="size-3.5" /> Approve
       </Button>
@@ -236,13 +298,41 @@ function ApprovalButtons({ run, size = 'md' }: { run: Run; size?: 'sm' | 'md' })
             body: `${run.id} will stop at "${step?.name}" and the requester will be notified.`,
             confirmLabel: 'Reject',
             danger: true,
-            onConfirm: () => toast(`Rejected — ${run.id} stopped at "${step?.name}"`),
+            onConfirm: () => {
+              record('reject', [run.id], step?.name)
+              toast(`Rejected — ${run.id} stopped at "${step?.name}"`)
+            },
           })
         }
       >
         <ThumbsDown className="size-3.5" /> Reject
       </Button>
     </>
+  )
+}
+
+function OperatorActivity({ run }: { run: Run }) {
+  const { forRun } = useActivity()
+  const entries = forRun(run.id)
+  if (!entries.length) return null
+  return (
+    <Card>
+      <CardHeader title="Operator activity" subtitle="Actions taken on this run in this session" />
+      <ul className="divide-y divide-slate-100 text-sm">
+        {entries.map((e) => (
+          <li key={e.id} className="flex items-center justify-between gap-2 px-4 py-2">
+            <span className="text-slate-800">
+              {ACTIVITY_LABEL[e.kind]}
+              {e.detail && <span className="text-slate-500"> · {e.detail}</span>}
+              {e.runIds.length > 1 && <span className="text-slate-500"> · bulk ({e.runIds.length} runs)</span>}
+            </span>
+            <span className="shrink-0 text-xs text-slate-500">
+              {e.actor} · {fmtClock(e.at)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
 
@@ -510,7 +600,7 @@ function CorrelationPanel({ run }: { run: Run }) {
           </div>
         </div>
         <div>
-          <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Other affected workflows</div>
+          <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Other runs by workflow</div>
           <ul className="space-y-1">
             {[...byWorkflow].map(([wfId, n]) => (
               <li key={wfId} className="flex items-center justify-between text-xs">

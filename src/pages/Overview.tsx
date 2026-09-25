@@ -6,6 +6,7 @@ import { Button, Card, CardHeader, HealthPill, PageHeader, Pill, Sparkline, Stat
 import { AGENT_BY_ID, SYSTEM_BY_ID, WORKFLOW_BY_ID } from '../data/catalog'
 import { NOW } from '../data/seed'
 import { useBulkAction } from '../lib/actions'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { activeIncidents, AGENT_SUMMARIES, computeStats, HEALTH_RANK, INCIDENT_MIN_RUNS, INCIDENT_WINDOW_MS, runsSince, type Incident } from '../lib/analysis'
 import { runsUrl } from '../lib/filters'
 import { fmtPct, fmtRelative, fmtTime } from '../lib/format'
@@ -14,9 +15,10 @@ import { HEALTH, SEVERITY } from '../lib/status'
 export function Overview() {
   const incidents = activeIncidents()
   const stats = computeStats(runsSince(24 * 3_600_000))
-  const worst = [...AGENT_SUMMARIES]
+  const worst = AGENT_SUMMARIES.filter((a) => a.health !== 'healthy')
     .sort((a, b) => HEALTH_RANK[a.health] - HEALTH_RANK[b.health] || b.stats24h.failureRate - a.stats24h.failureRate)
     .slice(0, 3)
+  useDocumentTitle('Overview')
 
   return (
     <div className="space-y-4">
@@ -55,6 +57,11 @@ export function Overview() {
         <ActivityChart />
         <Card>
           <CardHeader title="AI Employees needing attention" subtitle="Worst health first · last 24h" right={<Link to="/agents" className="text-xs font-medium text-indigo-600 hover:underline">All</Link>} />
+          {worst.length === 0 && (
+            <div className="flex items-center gap-2 px-4 py-6 text-sm text-slate-600">
+              <CheckCircle2 className="size-4 text-emerald-500" /> All AI Employees are healthy.
+            </div>
+          )}
           <ul className="divide-y divide-slate-100">
             {worst.map((a) => (
               <li key={a.agentId}>
@@ -121,7 +128,6 @@ function IncidentRow({ incident: inc, rank }: { incident: Incident; rank: number
   const navigate = useNavigate()
   const bulk = useBulkAction()
   const tone = SEVERITY[inc.severity]
-  const retryable = inc.runs.filter((r) => r.status === 'failed')
   return (
     <li className="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center">
       <div className="flex min-w-0 flex-1 gap-3">
@@ -161,7 +167,7 @@ function IncidentRow({ incident: inc, rank }: { incident: Incident; rank: number
         >
           View all affected runs <ArrowRight className="size-3.5" />
         </Button>
-        <Button size="sm" variant="primary" disabled={!retryable.length} onClick={() => bulk('retry', retryable)}>
+        <Button size="sm" variant="primary" onClick={() => bulk('retry', inc.runs)}>
           <RotateCcw className="size-3.5" /> Retry all
         </Button>
       </div>

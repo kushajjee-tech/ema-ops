@@ -10,6 +10,7 @@ import { AGENT_BY_ID, WORKFLOW_BY_ID, workflowSystems } from '../data/catalog'
 import { RUNS } from '../data/seed'
 import { AGENT_SUMMARY_BY_ID, systemSummaries, workflowStats } from '../lib/analysis'
 import { fmtPct } from '../lib/format'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { HEALTH } from '../lib/status'
 
 type Tab = 'overview' | 'workflows' | 'runs' | 'systems'
@@ -18,6 +19,7 @@ export function AgentDetail() {
   const { agentId } = useParams()
   const [params, setParams] = useSearchParams()
   const agent = agentId ? AGENT_BY_ID[agentId] : undefined
+  useDocumentTitle(agent?.name ?? 'AI Employee not found')
   if (!agent) {
     return (
       <Card>

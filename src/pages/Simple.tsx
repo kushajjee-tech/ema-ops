@@ -2,8 +2,10 @@ import { ConnectedSystemsTable } from '../components/ConnectedSystemsTable'
 import { RunsTable } from '../components/RunsTable'
 import { Card, PageHeader } from '../components/ui'
 import { RUNS } from '../data/seed'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 export function RunsPage() {
+  useDocumentTitle('Runs')
   return (
     <div>
       <PageHeader title="Runs" subtitle={`All runs across every AI Employee · ${RUNS.length} in the last 7 days`} />
@@ -13,6 +15,7 @@ export function RunsPage() {
 }
 
 export function SystemsPage() {
+  useDocumentTitle('Connected Systems')
   return (
     <div>
       <PageHeader

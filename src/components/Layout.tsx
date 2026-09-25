@@ -3,6 +3,7 @@ import { Activity, Bot, LayoutDashboard, Menu, Network, PanelLeftClose, PanelLef
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { activeIncidents } from '../lib/analysis'
+import { UserMenu } from './UserMenu'
 
 const NAV = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -13,9 +14,6 @@ const NAV = [
 
 const incidentCount = activeIncidents().length
 
-/** Signed-in operator (mocked — no real auth in the prototype). */
-const CURRENT_USER = { name: 'Kusha Jagarwal', role: 'IT Operations Admin', initials: 'KJ' }
-
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -23,8 +21,9 @@ export function Layout() {
 
   useEffect(() => {
     setMobileOpen(false)
-    window.scrollTo(0, 0)
-  }, [location.pathname])
+    // Pages with a #hash scroll to their own anchor.
+    if (!location.hash) window.scrollTo(0, 0)
+  }, [location.pathname, location.hash])
 
   const sidebar = (compact: boolean) => (
     <div className="flex h-full flex-col">
@@ -37,20 +36,8 @@ export function Layout() {
           </div>
         )}
       </div>
-      <div className={clsx('flex items-center gap-2.5 border-b border-slate-800 px-4 py-3', compact && 'justify-center px-0')}>
-        <div
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white ring-2 ring-slate-800"
-          title={compact ? `${CURRENT_USER.name} · ${CURRENT_USER.role}` : undefined}
-          aria-label={CURRENT_USER.name}
-        >
-          {CURRENT_USER.initials}
-        </div>
-        {!compact && (
-          <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-medium text-slate-100">{CURRENT_USER.name}</div>
-            <div className="truncate text-[11px] text-slate-400">{CURRENT_USER.role}</div>
-          </div>
-        )}
+      <div className={clsx('border-b border-slate-800 p-2', compact && 'flex justify-center')}>
+        <UserMenu variant="sidebar" compact={compact} />
       </div>
       <nav className="flex-1 space-y-0.5 p-2">
         {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -70,7 +57,7 @@ export function Layout() {
             <Icon className="size-4 shrink-0" />
             {!compact && <span className="flex-1">{label}</span>}
             {!compact && to === '/' && incidentCount > 0 && (
-              <span className="rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">{incidentCount}</span>
+              <span title={`${incidentCount} active issue${incidentCount === 1 ? '' : 's'}`} className="rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">{incidentCount}</span>
             )}
           </NavLink>
         ))}
@@ -107,13 +94,9 @@ export function Layout() {
           <Menu className="size-5" />
         </button>
         <span className="text-sm font-semibold">Ema Ops</span>
-        <span
-          className="ml-auto flex size-7 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-semibold text-white"
-          title={`${CURRENT_USER.name} · ${CURRENT_USER.role}`}
-          aria-label={CURRENT_USER.name}
-        >
-          {CURRENT_USER.initials}
-        </span>
+        <div className="ml-auto">
+          <UserMenu variant="topbar" />
+        </div>
       </div>
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">

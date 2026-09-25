@@ -101,6 +101,16 @@ function payload(step: { name: string; system: SystemId }, ctx: Ctx): { input: R
         output: { sys_id: `a${randInt(1e6, 9e6)}f3`, state: step.name.startsWith('Close') ? 'Closed' : 'In Progress' },
       }
     case 'sap':
+      if (step.name === 'Sync payroll deductions')
+        return {
+          input: { employee: ctx.person, payrollArea: 'US-BW', plans: ['MEDICAL_PPO', 'DENTAL', '401K'], perPeriod: Math.round(ctx.amount / 50) },
+          output: { infotype: '0014', recordsCreated: 3, effectiveDate: '2026-10-01' },
+        }
+      if (step.name === 'Issue refund')
+        return {
+          input: { order: ctx.order, customer: ctx.customer, amount: Math.round(ctx.amount / 20), currency: 'USD', reason: 'customer_request' },
+          output: { creditMemo: `9${randInt(1e7, 9e7)}`, status: 'POSTED' },
+        }
       return {
         input: { companyCode: '1000', document: ctx.invoice, vendor: ctx.vendor, amount: ctx.amount, currency: 'USD' },
         output: { documentNumber: `51000${randInt(10000, 99999)}`, fiscalYear: 2026, status: 'POSTED' },

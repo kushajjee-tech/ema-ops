@@ -9,6 +9,7 @@ import { useBulkAction } from '../lib/actions'
 import { applyFilters, FILTER_KEYS, parseFilters, RANGE_PRESETS, toParams, type RangePreset, type RunFilters } from '../lib/filters'
 import { fmtDateTime, fmtDuration, fmtRelative, fmtTime } from '../lib/format'
 import { RUN_STATUS, RUN_STATUS_ORDER } from '../lib/status'
+import { LatestActivityChip } from './ActivityChip'
 import { Button, Card, Empty, StatusPill, SystemBadge } from './ui'
 
 const PAGE_SIZE = 25
@@ -28,7 +29,13 @@ export function RunsTable({ locked }: Props) {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const bulk = useBulkAction()
-  const filters: RunFilters = { ...parseFilters(params), ...locked }
+  const filterKey = params.toString()
+  // Filters are fully described by the URL (plus locked scope), so filterKey is a sufficient memo key.
+  const lockedAgent = locked?.agent
+  const filters: RunFilters = useMemo(
+    () => ({ ...parseFilters(new URLSearchParams(filterKey)), ...(lockedAgent ? { agent: lockedAgent } : {}) }),
+    [filterKey, lockedAgent],
+  )
   const page = Math.max(1, Number(params.get('page') ?? 1))
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'startedAt', dir: 'desc' })
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -38,8 +45,7 @@ export function RunsTable({ locked }: Props) {
     const out = applyFilters(scoped, filters)
     const val = (r: Run) => (sort.key === 'startedAt' ? r.startedAt : r.durationMs)
     return out.sort((a, b) => (sort.dir === 'asc' ? val(a) - val(b) : val(b) - val(a)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scoped, params.toString(), sort])
+  }, [scoped, filterKey, sort])
 
   // Status counts ignore the status filter itself so the chips show what's available.
   const statusCounts = useMemo(() => {
@@ -48,8 +54,7 @@ export function RunsTable({ locked }: Props) {
     for (const s of RUN_STATUS_ORDER) c[s] = 0
     for (const r of base) c[r.status]++
     return c
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scoped, params.toString()])
+  }, [scoped, filterKey])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
@@ -270,7 +275,12 @@ export function RunsTable({ locked }: Props) {
                 <tr
                   key={r.id}
                   onClick={() => navigate(`/runs/${r.id}`)}
-                  className={clsx('cursor-pointer hover:bg-slate-50', selected.has(r.id) && 'bg-indigo-50/50')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/runs/${r.id}`)
+                  }}
+                  tabIndex={0}
+                  aria-label={`Open run ${r.id}`}
+                  className={clsx('cursor-pointer hover:bg-slate-50 focus-visible:bg-indigo-50 focus-visible:outline-none', selected.has(r.id) && 'bg-indigo-50/50')}
                 >
                   <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
                     <input
@@ -299,7 +309,10 @@ export function RunsTable({ locked }: Props) {
                   {!locked?.agent && <td className="whitespace-nowrap px-3 py-1.5 text-slate-700">{AGENT_BY_ID[r.agentId].name}</td>}
                   <td className="whitespace-nowrap px-3 py-1.5 text-slate-700">{WORKFLOW_BY_ID[r.workflowId].name}</td>
                   <td className="px-3 py-1.5">
-                    <StatusPill status={r.status} />
+                    <div className="flex items-center gap-1.5">
+                      <StatusPill status={r.status} />
+                      <LatestActivityChip runId={r.id} compact />
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-slate-600" title={fmtDateTime(r.startedAt)}>
                     <span className="tabular-nums">{fmtDateTime(r.startedAt)}</span>
